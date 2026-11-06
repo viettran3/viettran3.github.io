@@ -1,0 +1,14 @@
+@page{size:Letter;margin:.45in .55in}
+*{box-sizing:border-box}
+body{font:9.8pt/1.32 "Helvetica Neue",Helvetica,Arial,sans-serif;color:#111;margin:0;max-width:7.4in}
+@media screen{body{margin:30px auto;padding:0 20px}}
+header{text-align:center;border-bottom:1.5px solid #5b4bd6;padding-bottom:6px;margin-bottom:6px}
+h1{font-size:21pt;margin:0;letter-spacing:-.01em}
+header p{margin:3px 0 0;color:#333;font-size:9.5pt}
+h2{font-size:10pt;text-transform:uppercase;letter-spacing:.12em;color:#3a2fb0;border-bottom:.75px solid #bbb;margin:8px 0 3px;padding-bottom:2px}
+.pi{margin:4px 0 4px;break-inside:avoid}
+.pr{display:flex;justify-content:space-between;gap:12px}
+.pr span{color:#333;white-space:nowrap}
+ul{margin:2px 0 0;padding-left:16px}li{margin:1px 0}
+.sk{margin:2px 0}
+@media print{body{max-width:none}}
