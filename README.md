@@ -13,6 +13,10 @@ editing these files by hand will be overwritten by the next publish.
   browser), and lets you request a 30-minute call
 - **Booking a call:** handled by a small helper on `viethtran.sites.tab.bot`, which this site calls behind the scenes
 
+## Say hi
+Want to talk? Open **Ask my assistant** on the site and pick **Book a call**, or find Viet on
+[LinkedIn](https://www.linkedin.com/in/viet-h-tran).
+
 ## How updates get here
 Viet edits the site in his private editor. Each publish rebuilds the pages and pushes this repo,
 and GitHub Pages redeploys within a minute or two. A copy of the same site also lives at
