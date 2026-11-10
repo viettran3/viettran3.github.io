@@ -254,6 +254,7 @@
     const tiles = $$('[data-photo]'); let cur = 0;
     const show = (i) => {
       cur = (i + tiles.length) % tiles.length; const ph = (S.photos || [])[cur] || {};
+      $('.lb-media', lb).classList.toggle('land', ph.shape === 'landscape');
       $('.lb-media', lb).innerHTML = ph.src ? `<img src="${esc(U(ph.src))}" alt="${esc(ph.alt || ph.caption)}">` : `<span class="mono">photo slot ${String(cur + 1).padStart(2, '0')} · coming soon</span>`;
       $('.lb-cap', lb).textContent = `${ph.caption || ''}  ·  ${cur + 1}/${tiles.length}`;
     };
