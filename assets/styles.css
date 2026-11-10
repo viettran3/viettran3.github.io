@@ -284,3 +284,18 @@ body.ask-page .ask-fab,body.chat-open .ask-fab{display:none}
 .term-x{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;font:12px var(--mono);padding:6px 9px;cursor:pointer}
 
 @media (max-width:600px){.ask-fab{padding:11px 14px 11px 12px;font-size:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom))}.ask-fab .long{display:none}}
+
+/* home blocks arranged in the editor's Layout mode: photo strip, music card, text and contact blocks */
+.album-strip{grid-template-columns:repeat(2,1fr)}
+@media (min-width:720px){.album-strip{grid-template-columns:repeat(4,1fr)}}
+a.ph{display:block;text-decoration:none}
+.music-card{display:flex;align-items:center;gap:18px;text-decoration:none;color:inherit}
+.music-card b{display:block;font-size:18px;margin-bottom:2px}
+.music-card .dim{display:block}
+.music-card .eq{margin:0;height:34px;flex:none}
+.eq.still i{animation:none;transform:none}
+.music-card .arrow{margin-left:auto;color:var(--muted);transition:transform .2s,color .2s}
+.music-card:hover .arrow{transform:translateX(3px);color:var(--cyan)}
+.contact-card h2{font-size:24px;margin:0 0 6px}
+.contact-card p{margin:0}
+.contact-card .actions{margin-top:18px}
