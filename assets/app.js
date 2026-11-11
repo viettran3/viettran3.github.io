@@ -12,6 +12,13 @@
   // Booking helper: one base URL from content/site.json → api.base (same site on tab.bot; the tab.bot helper when served from GitHub Pages).
   const API = (() => { const b = String(S.apiBase || ''); try { return !b || new URL(b).origin === location.origin ? '' : b; } catch (e) { return ''; } })();
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  // site text from content/site.json → ui (the fallbacks are the original words)
+  const UI = S.ui || {};
+  const TX = (group, key, dflt) => { const g = UI[group]; const v = g && g[key]; return typeof v === 'string' ? v : dflt; };
+  const TL = (group, key, dflt) => { const g = UI[group]; const v = g && g[key]; return Array.isArray(v) && v.length ? v : dflt; };
+  const fillT = (s, o) => String(s).replace(/\{(\w+)\}/g, (m, k) => (o[k] !== undefined ? o[k] : m));
+  const BOOK = TX('chat', 'bookCall', 'Book a call');
+  const isBook = (q) => q === BOOK || q === 'Book a call';
 
   /* ---------- cursor glow (fine pointers only) ---------- */
   const glow = $('.glow');
@@ -36,8 +43,8 @@
   function answer(q) {
     const ql = q.toLowerCase();
     if (/\b(book|schedule|set up|setup|meet|call|chat with|talk to|calendar|interview)\b/.test(ql) && !/what|who/.test(ql.split(' ')[0])) return { book: true };
-    if (/^(hi|hey|hello|yo|sup|hiya|howdy)\b/.test(ql.trim())) return { text: `Hey! I'm Viet's assistant. Ask me about his work, projects, background or skills, or I can book a call with him.` };
-    if (/\b(thanks|thank you|thx|ty)\b/.test(ql)) return { text: 'Anytime! Anything else you want to know about Viet?' };
+    if (/^(hi|hey|hello|yo|sup|hiya|howdy)\b/.test(ql.trim())) return { text: TX('chat', 'hello', `Hey! I'm Viet's assistant. Ask me about his work, projects, background or skills, or I can book a call with him.`) };
+    if (/\b(thanks|thank you|thx|ty)\b/.test(ql)) return { text: TX('chat', 'thanks', 'Anytime! Anything else you want to know about Viet?') };
     const qt = tok(q).map(stem);
     let best = null, bestS = 0;
     for (const d of docs) {
@@ -47,7 +54,7 @@
       if (d.kind === 'faq') s *= 1.15;
       if (s > bestS) { bestS = s; best = d; }
     }
-    if (!best || bestS < 2.5) return { text: `I only know what's on Viet's resume, projects and bio, and I don't have that one. Try asking about DemystifyAI, his app suite, Amazon, his research or skills, or I can set up a call so you can ask him directly.`, offerBook: true };
+    if (!best || bestS < 2.5) return { text: TX('chat', 'unknown', `I only know what's on Viet's resume, projects and bio, and I don't have that one. Try asking about DemystifyAI, his app suite, Amazon, his research or skills, or I can set up a call so you can ask him directly.`), offerBook: true };
     return { text: best.text, link: best.link, offerBook: best.action === 'book' };
   }
 
@@ -72,15 +79,15 @@
 
   /* ---------- chat UI ---------- */
   function buildChat(host, { floating }) {
-    const box = el('div', { class: 'chat', role: floating ? 'dialog' : 'region', 'aria-label': 'Ask my assistant' });
-    box.innerHTML = `<div class="chat-h"><span class="av" aria-hidden="true">VT</span><div><b>Viet's assistant</b><small>● answers from his resume & projects</small></div>${floating ? '<button class="chat-x" type="button" aria-label="Close chat">✕</button>' : ''}</div>
+    const box = el('div', { class: 'chat', role: floating ? 'dialog' : 'region', 'aria-label': TX('commandMenu', 'ask', 'Ask my assistant') });
+    box.innerHTML = `<div class="chat-h"><span class="av" aria-hidden="true">VT</span><div><b>${esc(TX('chat', 'title', "Viet's assistant"))}</b><small>${esc(TX('chat', 'subtitle', '● answers from his resume & projects'))}</small></div>${floating ? '<button class="chat-x" type="button" aria-label="Close chat">✕</button>' : ''}</div>
       <div class="chat-log" aria-live="polite"></div><div class="sugg"></div>
-      <form class="chat-f" autocomplete="off"><input name="q" type="text" placeholder="Ask about Viet…" aria-label="Your question" maxlength="300" enterkeyhint="send"><button type="submit">Send</button></form>`;
+      <form class="chat-f" autocomplete="off"><input name="q" type="text" placeholder="${esc(TX('chat', 'placeholder', 'Ask about Viet…'))}" aria-label="Your question" maxlength="300" enterkeyhint="send"><button type="submit">${esc(TX('chat', 'send', 'Send'))}</button></form>`;
     host.appendChild(box);
     const log = $('.chat-log', box), sugg = $('.sugg', box), form = $('.chat-f', box), input = $('input', form);
     const add = (who, html) => { const m = el('div', { class: `msg ${who}` }, html); log.appendChild(m); log.scrollTop = log.scrollHeight; return m; };
     const setSugg = (arr) => { sugg.innerHTML = ''; arr.forEach((q) => { const b = el('button', { type: 'button' }, esc(q)); b.onclick = () => ask(q); sugg.appendChild(b); }); };
-    const DEFAULT = ['What did he build at DemystifyAI?', 'What is he studying?', 'Tell me about his app suite', 'Book a call'];
+    const DEFAULT = TL('chat', 'suggestions', ['What did he build at DemystifyAI?', 'What is he studying?', 'Tell me about his app suite', 'Book a call']);
     function ask(q) {
       q = String(q || '').trim(); if (!q) return;
       add('me', esc(q)); input.value = '';
@@ -88,43 +95,44 @@
       setTimeout(() => {
         t.remove();
         const a = answer(q);
-        if (a.book) return startBooking();
-        add('bot', esc(a.text) + (a.link ? `\n<a href="${U(a.link)}">Read more →</a>` : ''));
-        setSugg(a.offerBook ? ['Book a call', ...DEFAULT.slice(0, 2)] : DEFAULT.filter((x) => x.toLowerCase() !== q.toLowerCase()).slice(0, 4));
+        if (a.book || isBook(q)) return startBooking();
+        add('bot', esc(a.text) + (a.link ? `\n<a href="${U(a.link)}">${esc(TX('chat', 'readMore', 'Read more →'))}</a>` : ''));
+        setSugg(a.offerBook ? [BOOK, ...DEFAULT.filter((x) => !isBook(x)).slice(0, 2)] : DEFAULT.filter((x) => x.toLowerCase() !== q.toLowerCase()).slice(0, 4));
       }, 380 + Math.min(500, q.length * 8));
     }
     function startBooking() {
       setSugg([]);
       const list = slots();
-      const m = add('bot', `Happy to set that up. Viet takes ${B.durationMinutes}-minute calls at least ${B.minDaysOut} days out so he can prepare. Pick a time and tell me a bit about you; he'll confirm by email.`);
+      const m = add('bot', esc(fillT(TX('chat', 'bookingIntro', `Happy to set that up. Viet takes {minutes}-minute calls at least {days} days out so he can prepare. Pick a time and tell me a bit about you; he'll confirm by email.`), { minutes: B.durationMinutes, days: B.minDaysOut })));
       const f = el('form', { class: 'bk', novalidate: '' });
-      f.innerHTML = `<label>Time<select name="slot" required>${list.map((d) => `<option value="${d.toISOString()}">${fmtSlot(d)}</option>`).join('')}</select></label>
-        <span class="tz">shown in Central Time${Intl.DateTimeFormat().resolvedOptions().timeZone !== B.timezone ? ' (Viet is in Chicago)' : ''}</span>
-        <label>Name<input name="name" required maxlength="120" autocomplete="name"></label>
-        <label>Email<input name="email" type="email" required maxlength="160" autocomplete="email" inputmode="email"></label>
-        <label>Company / role<input name="company" required maxlength="160" autocomplete="organization" placeholder="e.g. Recruiter at Acme"></label>
-        <label>What would you like to talk about?<textarea name="reason" required maxlength="1200"></textarea></label>
+      const C = (k, d) => esc(TX('chat', k, d));
+      f.innerHTML = `<label>${C('timeLabel', 'Time')}<select name="slot" required>${list.map((d) => `<option value="${d.toISOString()}">${fmtSlot(d)}</option>`).join('')}</select></label>
+        <span class="tz">${C('tzNote', 'shown in Central Time')}${Intl.DateTimeFormat().resolvedOptions().timeZone !== B.timezone ? ' ' + C('tzAway', '(Viet is in Chicago)') : ''}</span>
+        <label>${C('nameLabel', 'Name')}<input name="name" required maxlength="120" autocomplete="name"></label>
+        <label>${C('emailLabel', 'Email')}<input name="email" type="email" required maxlength="160" autocomplete="email" inputmode="email"></label>
+        <label>${C('companyLabel', 'Company / role')}<input name="company" required maxlength="160" autocomplete="organization" placeholder="${C('companyPlaceholder', 'e.g. Recruiter at Acme')}"></label>
+        <label>${C('reasonLabel', 'What would you like to talk about?')}<textarea name="reason" required maxlength="1200"></textarea></label>
         <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-        <span class="err" role="alert"></span><button type="submit">Request this time</button>`;
+        <span class="err" role="alert"></span><button type="submit">${C('submit', 'Request this time')}</button>`;
       m.appendChild(f); log.scrollTop = log.scrollHeight;
       fetch(API + '/api/taken').then((r) => r.ok ? r.json() : null).then((j) => { if (!j || !Array.isArray(j.taken)) return; const t = new Set(j.taken); $$('option', f).forEach((o) => { if (t.has(o.value)) o.remove(); }); }).catch(() => {});
       f.onsubmit = async (e) => {
         e.preventDefault();
         const fd = Object.fromEntries(new FormData(f).entries()); const err = $('.err', f);
-        if (!fd.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fd.email) || !fd.company.trim() || !fd.reason.trim()) { err.textContent = 'Please fill in every field with a valid email.'; return; }
-        err.textContent = ''; const btn = $('button', f); btn.disabled = true; btn.textContent = 'Sending…';
+        if (!fd.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fd.email) || !fd.company.trim() || !fd.reason.trim()) { err.textContent = TX('chat', 'fillAll', 'Please fill in every field with a valid email.'); return; }
+        err.textContent = ''; const btn = $('button', f); btn.disabled = true; btn.textContent = TX('chat', 'sending', 'Sending…');
         try {
           const r = await fetch(API + '/api/book', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...fd, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, page: location.pathname }) });
           const j = await r.json().catch(() => ({}));
           if (!r.ok || !j.ok) throw new Error(j.error || 'That didn’t go through.');
           f.remove();
-          add('bot', `You're on the list for ${esc(fmtSlot(new Date(fd.slot)))}. Viet will confirm by email at ${esc(fd.email)}. Thanks, ${esc(fd.name.split(' ')[0])}!`);
+          add('bot', esc(fillT(TX('chat', 'confirmed', `You're on the list for {slot}. Viet will confirm by email at {email}. Thanks, {first}!`), { slot: fmtSlot(new Date(fd.slot)), email: fd.email, first: fd.name.split(' ')[0] })));
           setSugg(DEFAULT.slice(0, 3));
-        } catch (x) { btn.disabled = false; btn.textContent = 'Request this time'; err.textContent = (x && x.message) || 'That didn’t go through. Please try again, or reach Viet on LinkedIn.'; }
+        } catch (x) { btn.disabled = false; btn.textContent = TX('chat', 'submit', 'Request this time'); err.textContent = (x && x.message) || 'That didn’t go through. Please try again, or reach Viet on LinkedIn.'; }
       };
     }
     form.onsubmit = (e) => { e.preventDefault(); ask(input.value); };
-    add('bot', `Hi! I'm Viet's assistant. Ask me anything about his experience, projects or background, or I can book a call with him.`);
+    add('bot', esc(TX('chat', 'greeting', `Hi! I'm Viet's assistant. Ask me anything about his experience, projects or background, or I can book a call with him.`)));
     setSugg(DEFAULT);
     return { box, ask, input, startBooking };
   }
@@ -133,10 +141,10 @@
   const inlineChat = inlineHost ? buildChat(inlineHost, { floating: false }) : null;
   if (inlineHost) inlineHost.classList.add('chat-inline');
   function openChat(q) {
-    if (inlineChat) { inlineChat.input.focus(); if (q) (q === 'Book a call' ? inlineChat.startBooking() : inlineChat.ask(q)); return; }
+    if (inlineChat) { inlineChat.input.focus(); if (q) (isBook(q) ? inlineChat.startBooking() : inlineChat.ask(q)); return; }
     if (!panel) { panel = el('div', { class: 'chat-panel' }); document.body.appendChild(panel); panelChat = buildChat(panel, { floating: true }); $('.chat-x', panel).onclick = closeChat; }
     panel.hidden = false; document.body.classList.add('chat-open');
-    if (q) (q === 'Book a call' ? panelChat.startBooking() : panelChat.ask(q));
+    if (q) (isBook(q) ? panelChat.startBooking() : panelChat.ask(q));
     else if (matchMedia('(pointer:fine)').matches) panelChat.input.focus();
   }
   function closeChat() { if (panel) panel.hidden = true; document.body.classList.remove('chat-open'); }
@@ -147,22 +155,22 @@
 
   /* ---------- ⌘K command menu ---------- */
   const CMDS = [
-    { g: 'Pages', t: 'About', ic: '~', run: () => go('/') },
-    { g: 'Pages', t: 'Resume', ic: '≡', run: () => go('/resume/') },
-    { g: 'Pages', t: 'Projects', ic: '◇', run: () => go('/projects/') },
-    { g: 'Pages', t: 'Photos', ic: '▦', run: () => go('/photos/') },
-    { g: 'Pages', t: 'Music', ic: '♪', run: () => go('/music/') },
+    { g: 'Pages', t: TX('nav', 'about', 'About'), ic: '~', run: () => go('/') },
+    { g: 'Pages', t: TX('nav', 'resume', 'Resume'), ic: '≡', run: () => go('/resume/') },
+    { g: 'Pages', t: TX('nav', 'projects', 'Projects'), ic: '◇', run: () => go('/projects/') },
+    { g: 'Pages', t: TX('nav', 'photos', 'Photos'), ic: '▦', run: () => go('/photos/') },
+    { g: 'Pages', t: TX('nav', 'music', 'Music'), ic: '♪', run: () => go('/music/') },
     ...S.projects.map((p) => ({ g: 'Projects', t: p.title, sub: p.role, ic: '→', run: () => go(`/projects/${p.slug}/`) })),
-    { g: 'Actions', t: 'Ask my assistant', ic: '?', run: () => openChat() },
-    { g: 'Actions', t: 'Book a call with Viet', ic: '☎', run: () => openChat('Book a call') },
-    { g: 'Actions', t: 'Download resume (PDF)', ic: '↓', run: () => go(S.links.resumePdf || '/resume/') },
-    { g: 'Actions', t: 'Open LinkedIn', ic: 'in', run: () => window.open(S.links.linkedin, '_blank', 'noopener') },
-    { g: 'Actions', t: 'Terminal mode', sub: '~', ic: '>_', run: () => openTerm() },
+    { g: 'Actions', t: TX('commandMenu', 'ask', 'Ask my assistant'), ic: '?', run: () => openChat() },
+    { g: 'Actions', t: TX('commandMenu', 'book', 'Book a call with Viet'), ic: '☎', run: () => openChat(BOOK) },
+    { g: 'Actions', t: TX('commandMenu', 'download', 'Download resume (PDF)'), ic: '↓', run: () => go(S.links.resumePdf || '/resume/') },
+    { g: 'Actions', t: TX('commandMenu', 'linkedin', 'Open LinkedIn'), ic: 'in', run: () => window.open(S.links.linkedin, '_blank', 'noopener') },
+    { g: 'Actions', t: TX('commandMenu', 'terminal', 'Terminal mode'), sub: '~', ic: '>_', run: () => openTerm() },
   ];
   let cmdk = null, sel = 0, shown = [];
   function buildCmdk() {
     cmdk = el('div', { class: 'cmdk', hidden: '', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Command menu' });
-    cmdk.innerHTML = `<div class="cmdk-box"><div class="cmdk-in"><span class="mono" aria-hidden="true">›</span><input type="text" placeholder="Jump to a page, project or action…" aria-label="Search commands" role="combobox" aria-expanded="true" aria-controls="cmdk-list" autocomplete="off" spellcheck="false"><span class="mono">esc</span></div><ul class="cmdk-list" id="cmdk-list" role="listbox"></ul></div>`;
+    cmdk.innerHTML = `<div class="cmdk-box"><div class="cmdk-in"><span class="mono" aria-hidden="true">›</span><input type="text" placeholder="${esc(TX('commandMenu', 'placeholder', 'Jump to a page, project or action…'))}" aria-label="Search commands" role="combobox" aria-expanded="true" aria-controls="cmdk-list" autocomplete="off" spellcheck="false"><span class="mono">esc</span></div><ul class="cmdk-list" id="cmdk-list" role="listbox"></ul></div>`;
     document.body.appendChild(cmdk);
     const inp = $('input', cmdk);
     inp.addEventListener('input', () => { sel = 0; render(inp.value); });
@@ -177,7 +185,7 @@
     const ql = q.trim().toLowerCase();
     shown = CMDS.filter((c) => !ql || (c.t + ' ' + c.g + ' ' + (c.sub || '')).toLowerCase().includes(ql) || ql.split(/\s+/).every((w) => (c.t + ' ' + c.g).toLowerCase().includes(w)));
     const ul = $('.cmdk-list', cmdk); ul.innerHTML = '';
-    if (!shown.length) { ul.innerHTML = `<li class="cmdk-empty">No match. Try “projects”, “resume” or “ask”.</li>`; return; }
+    if (!shown.length) { ul.innerHTML = `<li class="cmdk-empty">${esc(TX('commandMenu', 'empty', 'No match. Try “projects”, “resume” or “ask”.'))}</li>`; return; }
     let g = '';
     shown.forEach((c, i) => {
       if (c.g !== g) { g = c.g; ul.appendChild(el('li', { class: 'cmdk-g', role: 'presentation' }, esc(g))); }
@@ -219,7 +227,7 @@
     switch ((cmd || '').toLowerCase()) {
       case '': return;
       case 'help': return print(`<span class="c">whoami</span>          who is this guy\n<span class="c">ls</span> [projects]     list pages or projects\n<span class="c">open</span> &lt;name&gt;      open a project or page (tab completes)\n<span class="c">cat resume</span>      quick resume\n<span class="c">ask</span> &lt;question&gt;  ask the assistant\n<span class="c">contact</span>         how to reach Viet\n<span class="c">clear</span>           clear the screen\n<span class="c">exit</span>            back to the site`);
-      case 'whoami': return print(`<span class="c">Viet Tran</span>\n${esc(S.intro || '')}\n<span class="d">born in Vietnam · grew up in rural Washington · UChicago ’29</span>`);
+      case 'whoami': return print(`<span class="c">Viet Tran</span>\n${esc(S.intro || '')}\n<span class="d">${esc(TX('terminal', 'whoamiLine', 'born in Vietnam · grew up in rural Washington · UChicago ’29'))}</span>`);
       case 'ls':
         if (!arg || arg === '~' || arg === '.') return print(`<span class="c">about/  resume/  projects/  photos/  music/  ask/</span>`);
         if (arg.startsWith('project')) return print(S.projects.map((p) => `<span class="c">${esc(p.slug.padEnd(14))}</span> ${esc(p.title)} <span class="d">· ${esc(p.when)}</span>`).join('\n'));
